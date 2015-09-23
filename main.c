@@ -13,7 +13,7 @@
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
 /* Create Enumeration of Possible lval Types */
-enum { LVAL_NUM, LVAL_SYM, LVAL_SEXPR, LVAL_ERR };
+enum { LVAL_NUM, LVAL_SYM, LVAL_QEXPR, LVAL_SEXPR, LVAL_ERR };
 
 /* Create Enumeration of Possible Error Types */
 enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM }; 
@@ -58,6 +58,15 @@ lval* lval_err(char* m)
     return v;
 }
 
+/* A pointer to a new empty Qexpr lval */
+lval* lval_qexpr(void) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_QEXPR;
+    v->count = 0;
+    v->cell = NULL;
+    return v;
+}
+
 /* Construct a pointer to a new Symbol lval */ 
 lval* lval_sym(char* s)
 {
@@ -89,7 +98,8 @@ void lval_del(lval* v)
     case LVAL_ERR: free(v->err); break;
     case LVAL_SYM: free(v->sym); break;
 
-        /* If Sexpr then delete all elements inside */
+        /* If sexpr or qexpr then delete all elements inside */
+    case LVAL_QEXPR:
     case LVAL_SEXPR:
         for (int i = 0; i < v->count; i++) {
             lval_del(v->cell[i]);
@@ -126,6 +136,7 @@ void lval_print(lval* v) {
     case LVAL_NUM:   printf("%li", v->num); break;
     case LVAL_ERR:   printf("Error: %s", v->err); break;
     case LVAL_SYM:   printf("%s", v->sym); break;
+    case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
     case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
     }
 }
@@ -162,6 +173,7 @@ lval* lval_read(mpc_ast_t* t)
     /* TODO: perhaps an assert would be better here? x always = lval_sexpr() */
     if(strcmp(t->tag, ">") == 0) { x = lval_sexpr(); } /* AST root */
     if(strstr(t->tag, "sexpr"))  { x = lval_sexpr(); }
+    if(strstr(t->tag, "qexpr"))  { x = lval_qexpr(); }
 
     for(int i = 0; i < t->children_num; i++) {
         if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
@@ -284,17 +296,11 @@ int main()
 {
     char* prompt = "flisp> ";
 
-    char* grammar =
-        "number   : /-?[0-9]+/ ;\n"
-        "symbol   : '+' | '-' | '*' | '/' ;\n"
-        "expr     : <number> | '(' <operator> <expr>+ ')' ;\n"
-        "sexpr    : '(' <expr>* ')' ;\n"
-        "flisp    : /^/ <operator> <expr>+ /$/ ;\n";
-    
     /* Create Some Parsers */
     mpc_parser_t* number   = mpc_new("number");
     mpc_parser_t* symbol   = mpc_new("symbol");
-    mpc_parser_t* sexpr     = mpc_new("sexpr");
+    mpc_parser_t* qexpr    = mpc_new("qexpr");
+    mpc_parser_t* sexpr    = mpc_new("sexpr");
     mpc_parser_t* expr     = mpc_new("expr");
     mpc_parser_t* flisp    = mpc_new("flisp");
 
@@ -304,10 +310,11 @@ int main()
                 number : /-?[0-9]+/ ;                                \
                 symbol : '+' | '-' | '*' | '/' ;                     \
                 sexpr  : '(' <expr>* ')' ;                           \
-                expr   : <number> | <symbol> | <sexpr> ;             \
+                qexpr  : '{' <expr>* '}' ;                           \
+                expr   : <number> | <symbol> | <sexpr> | <qexpr> ;   \
                 flisp  : /^/ <expr>* /$/ ;                           \
               ",
-              number, symbol, sexpr, expr, flisp);
+              number, symbol, sexpr, qexpr, expr, flisp);
     
     printf("Finn's lisp interpreter 0.0.1\n");
     printf("Press Ctrl+C to exit\n");
@@ -334,7 +341,7 @@ int main()
         free(input);
     }
 
-    mpc_cleanup(5, number, symbol, sexpr, expr, flisp);
+    mpc_cleanup(5, number, symbol, sexpr, qexpr, expr, flisp);
     
     return 0;
 }
