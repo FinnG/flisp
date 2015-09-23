@@ -4,7 +4,7 @@ CC=gcc
 CFLAGS=-g -std=c99
 INCLUDES=-I $(MPC_DIR)
 LIBS=-ledit -lm
-SRCS=main.c $(MPC_DIR)/mpc.c
+SRCS=main.c lval.c $(MPC_DIR)/mpc.c
 
 .PHONY: all
 
