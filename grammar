@@ -1,4 +1,0 @@
-number   : /-?[0-9]+/ ;
-operator : '+' | '-' | '*' | '/' ;
-expr     : <number> | '(' <operator> <expr>+ ')' ;
-flisp    : /^/ <operator> <expr>+ /$/ ;
